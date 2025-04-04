@@ -73,10 +73,11 @@ where
     }
 
     fn list(&self) -> Result<Vec<Self::Item>> {
+        let entry_name = format!("{}.{}", CONFIG_PATH, self.ns);
         Ok(self
             .ctx
             .repo()
-            .list_config(&self.ns)?
+            .list_config(&entry_name)?
             .into_iter()
             .map(GitConfigEntry::new)
             .collect())

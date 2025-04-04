@@ -71,9 +71,9 @@ impl<C: Context> CommandContext<C> {
         };
 
         if let Some(repo_contents) = repo_contents {
-            let identities = self.get_identities()?;
+            let all_identities = self.get_identities()?;
             let mut cur = io::Cursor::new(repo_contents);
-            let decrypted = age::decrypt(&identities, &mut cur)?.unwrap_or_default();
+            let decrypted = age::decrypt(&all_identities, &mut cur)?.unwrap_or_default();
             if decrypted == contents {
                 log::debug!("Decrypted content matches, using from working copy");
                 self.ctx.store_sidecar(&file, "hash", hash.as_bytes())?;
@@ -95,7 +95,14 @@ impl<C: Context> CommandContext<C> {
 
     fn get_identities(&self) -> Result<Vec<String>> {
         log::debug!("Loading identities from config");
-        let all_identities = self.ctx.repo().list_config("identity")?;
+        let all_identities: Vec<String> = self
+            .ctx
+            .age_identities()
+            .list()?
+            .into_iter()
+            .map(|i| i.path)
+            .collect();
+
         log::debug!(
             "Loaded identities from config; identities='{:?}'",
             all_identities
@@ -128,15 +135,7 @@ impl<C: Context> CommandContext<C> {
 
     pub(crate) fn textconv(&self, path: impl AsRef<Path>) -> Result<()> {
         log::info!("Decrypting file to show in diff");
-
-        let all_identities: Vec<String> = self
-            .ctx
-            .age_identities()
-            .list()?
-            .into_iter()
-            .map(|i| i.path)
-            .collect();
-
+        let all_identities: Vec<String> = self.get_identities()?;
         let mut f = File::open(path)?;
         let result = if let Some(rv) = age::decrypt(&all_identities, &mut f)? {
             log::info!("Decrypted file to show in diff");
